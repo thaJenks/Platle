@@ -184,6 +184,31 @@ def find_platinum(soup):
     return None
 
 
+def find_trophies(soup):
+    """Every trophy on the page: name, type, description, PSN rate."""
+    out, seen = [], set()
+    for img in soup.find_all("img", src=re.compile(r"psnobj")):
+        alt = clean(img.get("alt"))
+        if not alt or alt in seen:
+            continue
+        box = img
+        for _ in range(8):
+            box = box.parent
+            if box is None or "PSN Rate" in box.get_text(" "):
+                break
+        if box is None:
+            continue
+        m = re.search(
+            re.escape(alt) + r"\s+(Platinum|Gold|Silver|Bronze)\b\s*(.*?)\s*([\d.]+)%\s*PP Rate\s*([\d.]+)%\s*PSN Rate",
+            text_of(box),
+        )
+        if m:
+            seen.add(alt)
+            out.append({"name": alt, "type": m.group(1).lower(), "desc": m.group(2).strip(),
+                        "psn": float(m.group(4))})
+    return out
+
+
 def count_trophy_groups(soup):
     """Each trophy group (base game + each DLC) is a heading followed by 4 counts."""
     groups = 0
@@ -241,6 +266,9 @@ def parse_game(html, gid, delay=0, fetch_series=True):
     if len(bd) == 4:
         g["breakdown"] = bd
         g.setdefault("total", sum(bd.values()))
+
+    # Every non-platinum trophy, for the "3 random trophies" hint
+    g["trophies"] = [t for t in find_trophies(soup) if t["type"] != "platinum"]
 
     groups = count_trophy_groups(soup)
     if groups:
@@ -307,7 +335,7 @@ def parse_game(html, gid, delay=0, fetch_series=True):
                     if m:
                         g["series"] = clean(m.group(1) or m.group(2))
 
-    return {k: v for k, v in g.items() if v not in (None, [], {})}
+    return {k: v for k, v in g.items() if k == "trophies" or v not in (None, [], {})}
 
 
 # ---------------------------------------------------------------- outputs
@@ -453,6 +481,17 @@ def main():
             add_games(picked, badge, args.daily - n, args.delay)
         picked["last_add"] = today
     save_json(PICKED, picked)
+
+    # One-time catch-up: games scraped before trophy lists were collected
+    missing = [gid for gid in picked["ids"] if "trophies" not in load_json(GAMES / f"{gid}.json", {})]
+    if missing:
+        print(f"Adding trophy lists to {len(missing)} games")
+        for gid in missing:
+            html = get(f"{BASE}/games/{gid}/", args.delay)
+            if html:
+                save_json(GAMES / f"{gid}.json", parse_game(html, gid, args.delay, fetch_series=False))
+                picked["done"][gid] = today
+        save_json(PICKED, picked)
 
     sched, today_n = update_schedule(picked)
 
