@@ -194,7 +194,7 @@ function setTitles(list){
   ALL_TITLES=[...new Set(list)].sort((a,b)=>a.localeCompare(b));
   TITLE_INDEX=ALL_TITLES.map(t=>[t,norm(t)]);
 }
-const MAX = 8;
+const MAX = 7;
 const LAUNCH = Date.UTC(2026,9,18); // Puzzle #1 = Oct 18, 2026
 
 /* ---------- Helpers ---------- */
@@ -224,16 +224,16 @@ let todayNo = Math.floor((Date.now()-LAUNCH)/86400000)+1;
 const ORDER = seededOrder(ANSWERS.length, 2026);
 
 /* ---------- Clue building ---------- */
-/* Fixed 8 hint tiers. Missing data shows N/A but the tier still counts. */
+/* Fixed 7 hint tiers. Missing data shows N/A but the tier still counts. */
 function buildClues(g){
   const NA = "N/A";
   const c = [];
   const add=(key,rows,img)=>c.push({key,rows,img});
 
-  // 1. Platinum icon + name (title hidden with *)
+  // 1. Platinum name only, no icon (title hidden with *)
   const platRows=[["Platinum",g.plat?redact(g.plat,g.title):NA]];
   if(g.platDesc) platRows.push(["Description",redact(g.platDesc,g.title)]);
-  add("plat",platRows,g.icon?{src:g.icon,cls:"plat-icon",alt:"Platinum trophy icon"}:null);
+  add("plat",platRows,null);
 
   // 2. Earn rate on PSN and PlatPursuit
   add("rarity",[["PSN earn rate",g.psn!=null?`${g.psn}%`:NA],["PlatPursuit earn rate",g.pp!=null?`${g.pp}%`:NA]]);
@@ -256,15 +256,15 @@ function buildClues(g){
   // 6. Developer
   add("developer",[["Developer",g.developer||NA]]);
 
-  // 7. Badges, or the series if it has no badge
-  if(g.badges&&g.badges.length) add("badges",[["Badges",g.badges.join(", ")]]);
-  else if(g.series) add("badges",[["Series",g.series]]);
-  else add("badges",[["Badges",NA]]);
-
-  // 8. Badge art, or game cover / screenshot
-  if(g.badgeArt) add("art",[["Badge art",""]],{src:g.badgeArt,cls:"art-img",alt:"Badge art"});
-  else if(g.cover||g.screenshot) add("art",[["Game art",""]],{src:g.cover||g.screenshot,cls:"art-img",alt:"Game art"});
-  else add("art",[["Badge art",NA]]);
+  // 7. Badges (or series) together with the badge art (or game art)
+  const last=[]; let art=null;
+  if(g.badges&&g.badges.length) last.push(["Badges",g.badges.join(", ")]);
+  else if(g.series) last.push(["Series",g.series]);
+  else last.push(["Badges",NA]);
+  if(g.badgeArt) art={src:g.badgeArt,cls:"art-img",alt:"Badge art"};
+  else if(g.cover||g.screenshot) art={src:g.cover||g.screenshot,cls:"art-img",alt:"Game art"};
+  else last.push(["Art",NA]);
+  add("badges",last,art);
 
   return c;
 }
