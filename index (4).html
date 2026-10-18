@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Platle – Guess the game from its platinum</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E7ECF3; --surface:#FFFFFF; --ink:#16203A; --muted:#5B6681;
+  --line:#C9D2E1; --plat:#7F95BE; --plat-soft:#DCE4F1;
+  --wrong:#C2413B; --close:#C99A06; --right:#2F7D6B; --focus:#2C4F9E;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1730; --surface:#18223F; --ink:#E6EBF5; --muted:#9AA6C2;
+    --line:#2C3A60; --plat:#B9C8E6; --plat-soft:#243256;
+    --wrong:#E5675F; --close:#E8C34A; --right:#5BBFA5; --focus:#9DB6F0;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1730; --surface:#18223F; --ink:#E6EBF5; --muted:#9AA6C2;
+  --line:#2C3A60; --plat:#B9C8E6; --plat-soft:#243256;
+  --wrong:#E5675F; --close:#E8C34A; --right:#5BBFA5; --focus:#9DB6F0;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:17px;line-height:1.5}
+main{max-width:560px;margin:0 auto;padding:20px 18px 40px}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+h1{font-family:"Chakra Petch","Barlow",sans-serif;font-weight:700;font-size:2.1rem;letter-spacing:.02em;margin:0;line-height:1}
+.puzzle-no{color:var(--muted);font-size:.95rem}
+
+/* The one bold thing: six trophy pips that fill as you burn guesses */
+.pips{display:flex;gap:8px;margin:18px 0 6px}
+.pip{flex:1;height:44px;border:2px solid var(--line);border-radius:6px 6px 14px 14px;
+  position:relative;background:var(--surface);transition:background .25s,border-color .25s}
+.pip::after{content:"";position:absolute;left:50%;bottom:-8px;width:40%;height:6px;transform:translateX(-50%);
+  background:var(--line);border-radius:2px;transition:background .25s}
+.pip.current{border-color:var(--plat)}
+.pip.wrong{background:var(--wrong);border-color:var(--wrong)}
+.pip.wrong::after{background:var(--wrong)}
+.pip.close{background:var(--close);border-color:var(--close)}
+.pip.close::after{background:var(--close)}
+.pip.right{background:var(--right);border-color:var(--right)}
+.pip.right::after{background:var(--right)}
+.pips-caption{color:var(--muted);font-size:.9rem;margin:14px 0 18px}
+
+.clues{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.clue{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+  display:grid;grid-template-columns:28px 1fr;gap:4px 10px}
+.clue.latest{border-color:var(--plat);box-shadow:0 0 0 3px var(--plat-soft)}
+.clue-n{font-family:"Chakra Petch",sans-serif;font-weight:700;color:var(--plat);font-size:1.1rem;line-height:1.5}
+.rows{display:flex;flex-direction:column;gap:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row .k{color:var(--muted);min-width:7.5em}
+.row .v{font-weight:600}
+.plat-icon{width:72px;height:72px;border-radius:8px;margin-top:6px;border:1px solid var(--line)}
+.art-img{width:100%;max-width:220px;border-radius:8px;margin-top:6px;border:1px solid var(--line)}
+.clue.locked{border-style:dashed;background:transparent;color:var(--muted)}
+
+.play{margin-top:20px}
+.field{position:relative}
+label.lbl{display:block;font-weight:600;margin-bottom:6px}
+input[type=text]{width:100%;font:inherit;padding:12px 14px;border-radius:10px;border:2px solid var(--line);
+  background:var(--surface);color:var(--ink)}
+input[type=text]:focus{outline:none;border-color:var(--focus)}
+.suggest{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;margin:0;padding:4px;list-style:none;max-height:240px;overflow-y:auto;z-index:5;
+  box-shadow:0 8px 24px rgba(15,23,48,.18)}
+.suggest li{padding:9px 10px;border-radius:7px;cursor:pointer}
+.suggest li[aria-selected="true"],.suggest li:hover{background:var(--plat-soft)}
+.actions{display:flex;gap:10px;margin-top:10px}
+button{font:inherit;font-weight:600;border-radius:10px;padding:11px 18px;cursor:pointer;border:2px solid var(--ink)}
+button:focus-visible,input:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.primary{background:var(--ink);color:var(--bg);flex:1}
+.ghost{background:transparent;color:var(--ink)}
+.msg{min-height:1.5em;margin:10px 0 0;color:var(--muted)}
+
+.guesses{list-style:none;padding:0;margin:18px 0 0;display:flex;flex-direction:column;gap:6px}
+.guesses li{display:flex;gap:10px;align-items:center;font-size:.98rem}
+.mark{width:14px;height:14px;border-radius:3px;flex:none}
+.mark.w{background:var(--wrong)} .mark.y{background:var(--close)} .mark.r{background:var(--right)} .mark.s{border:2px solid var(--wrong)}
+
+.result{margin-top:22px;background:var(--surface);border:2px solid var(--plat);border-radius:12px;padding:16px}
+.result h2{font-family:"Chakra Petch",sans-serif;font-size:1.5rem;margin:0 0 4px;line-height:1.2}
+.result p{margin:4px 0}
+.result .actions{flex-wrap:wrap}
+.stats{display:flex;gap:18px;margin:12px 0 4px;color:var(--muted);font-size:.92rem}
+.stats b{display:block;color:var(--ink);font-family:"Chakra Petch",sans-serif;font-size:1.3rem}
+.result a{color:var(--focus)}
+footer{margin-top:32px;color:var(--muted);font-size:.85rem}
+footer a{color:inherit}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Platle</h1>
+    <span class="puzzle-no" id="puzzleNo"></span>
+  </header>
+
+  <div class="pips" id="pips" aria-hidden="true"></div>
+  <p class="pips-caption" id="caption"></p>
+
+  <ol class="clues" id="clues" aria-live="polite"></ol>
+
+  <section class="play" id="play">
+    <div class="field">
+      <label class="lbl" for="guess">Which game is this platinum from?</label>
+      <input type="text" id="guess" autocomplete="off" placeholder="Start typing a game…" role="combobox"
+        aria-autocomplete="list" aria-controls="suggest" aria-expanded="false">
+      <ul class="suggest" id="suggest" role="listbox" hidden></ul>
+    </div>
+    <div class="actions">
+      <button class="primary" id="submitBtn">Guess</button>
+      <button class="ghost" id="skipBtn">Skip</button>
+    </div>
+    <p class="msg" id="msg"></p>
+  </section>
+
+  <ul class="guesses" id="guesses"></ul>
+
+  <section class="result" id="result" hidden></section>
+
+  <footer>
+    Trophy data from <a href="https://platpursuit.com/" rel="noopener">Platinum Pursuit</a>. Not affiliated with PlatPursuit or Sony Interactive Entertainment.
+  </footer>
+</main>
+
+<script>
+/* ---------- Data (snapshot from PlatPursuit.com) ----------
+   Fields are optional; clues are built only from what each game has.
+   Replace this array with your scraped games.json later. */
+const ANSWERS = [
+  { id:"NPWR22997_00", title:"A Plague Tale: Requiem", platforms:["PS5"], psn:3.3, pp:61.2,
+    total:36, breakdown:{platinum:1,gold:4,silver:9,bronze:22}, dlc:0,
+    released:"2022", est:"26.7 hours", genres:["Role-playing (RPG)","Adventure"], themes:["Action","Historical"],
+    developer:"Asobo Studio", publisher:"Focus Entertainment",
+    badges:["A Plague Tale (series)","GOTY 2022 Collection"],
+    plat:"Requiem", platDesc:"Earn all “A Plague Tale: Requiem” trophies",
+    icon:"https://psnobj.prod.dl.playstation.net/psnobj/NPWR22997_00/8d3853a8-43ee-4caf-b84a-950c9bd63209.png",
+    cover:"https://images.igdb.com/igdb/image/upload/t_cover_big/co5pwb.png" },
+  { id:"NPWR12786_00", title:"Jak 3", platforms:["PS4"], psn:4.2, pp:66.0, total:47, dlc:0,
+    badges:["Jak and Daxter Series"], badgeArt:"https://platpursuit-media-west.s3.amazonaws.com/media/badges/main/jak-and-daxter.png",
+    plat:"Fait Accompli" },
+  { id:"NPWR12791_00", title:"Jak II", platforms:["PS4"], psn:9.1, pp:78.8, total:41, dlc:0,
+    badges:["Jak and Daxter Series"], badgeArt:"https://platpursuit-media-west.s3.amazonaws.com/media/badges/main/jak-and-daxter.png",
+    plat:"Done Done Done" },
+  { id:"NPWR09746_00", title:"TrackMania Turbo", platforms:["PS4","PSVR"], psn:0.1, pp:18.4, total:49, dlc:0,
+    badges:["Trackmania Series"], badgeArt:"https://platpursuit-media-west.s3.amazonaws.com/media/badges/main/trackmania.png",
+    plat:"Trackmaster" },
+  { title:"Spyro the Dragon", platforms:["PS4"], psn:7.6, pp:78.8,
+    badges:["Spyro the Dragon Series"], badgeArt:"https://platpursuit-media-west.s3.amazonaws.com/media/badges/main/598356df96d14ad183b6108297a2c241.png",
+    plat:"Gnasty’s Demise" },
+  { title:"Spyro 2: Ripto’s Rage!", platforms:["PS4"], psn:5.5, pp:72.4,
+    badges:["Spyro the Dragon Series"], badgeArt:"https://platpursuit-media-west.s3.amazonaws.com/media/badges/main/598356df96d14ad183b6108297a2c241.png",
+    plat:"Ripto’s Remorse" }
+];
+/* Games without a PlatPursuit badge are guessable but never the answer */
+const NON_BADGE = ["Silent Hill 2","Operation: Tango","We Were Here Together","God of War Sons of Sparta","Darwin’s Paradox!","Echoes of the End"];
+
+/* Extra titles players can guess (wrong answers still need to be typeable) */
+const DECOYS = ["Sea of Thieves","TCG Card Shop Simulator","Deep Rock Galactic","Deep Rock Galactic: Survivor","Unpacking",
+"Grand Theft Auto: Vice City - The Definitive Edition","Grand Theft Auto III: The Definitive Edition","We Were Here Forever",
+"Order of the Sinking Star","Ball x Pit","Halo: Campaign Evolved","Call of Duty: Modern Warfare Remastered",
+"Death Stranding: Director’s Cut","Forza Horizon 5","The LEGO Movie Videogame","LEGO Marvel Super Heroes","RuneScape: Dragonwilds",
+"Diablo IV","LEGO Harry Potter Collection: Years 1-4","LEGO Harry Potter Collection: Years 5-7","Myst","Biped 2","Final Fantasy II",
+"Final Fantasy III","Big Walk","Rhythm Sprout","Haste","007 First Light","PowerWash Simulator","RoboCop: Rogue City",
+"RoboCop: Rogue City - Unfinished Business","A Plague Tale: Innocence","Golf With Your Friends","Iron Guard: Day Zero",
+"Murdered: Soul Suspect","Broken Sword: Shadow of the Templars Reforged","Uncharted: Legacy of Thieves Collection","NHL 26",
+"Spyro the Dragon","Spyro 2: Ripto’s Rage!","Spyro: Year of the Dragon","LEGO Star Wars II: The Original Trilogy","Jet Moto",
+"I.Q Intelligent Qube","Cool Boarders","Alone in the Dark","Alone in the Dark 2 (1996)","Minecraft: PlayStation4 Edition",
+"Warhammer 40,000: Space Marine II","Ratchet & Clank","Ratchet & Clank: All 4 One","Kingdom Hearts III","Call of Duty: Black Ops III",
+"Call of Duty: Modern Warfare II","Call of Duty: Modern Warfare III","Call of Duty: Black Ops 7","Bloodborne","Jak X: Combat Racing",
+"Jak and Daxter: The Precursor Legacy","Detroit: Become Human","Control: Ultimate Edition","Cat Quest III","Assassin’s Creed Mirage",
+"Doom","The Elder Scrolls IV: Oblivion Remastered","Forspoken","Neva","The Talos Principle 2","Thank Goodness You’re Here","Viewfinder",
+"Cocoon","Jusant","INDIKA","Sword of the Sea","Syberia: The World Before","Sayonara Wild Hearts","Silent Hill f","Silent Hill 2 HD",
+"Silent Hill: Downpour","Resident Evil Requiem","Resident Evil: Operation Raccoon City","Resident Evil Resistance","Reanimal",
+"Where Winds Meet","Saw","Mortal Kombat 1","Black Mirror","Crow Country","Fatal Frame: Mask of the Lunar Eclipse","Umbrella Corps",
+"Grim Fandango Remastered","Trials Fusion","A Game About Digging A Hole"];
+
+let ALL_TITLES = [], TITLE_INDEX = [];
+function setTitles(list){
+  ALL_TITLES=[...new Set(list)].sort((a,b)=>a.localeCompare(b));
+  TITLE_INDEX=ALL_TITLES.map(t=>[t,norm(t)]);
+}
+const MAX = 6;
+const LAUNCH = Date.UTC(2026,9,18); // Puzzle #1 = Oct 18, 2026
+
+/* ---------- Helpers ---------- */
+const norm = s => s.toLowerCase().normalize("NFKD").replace(/[’']/g,"").replace(/[^a-z0-9]+/g,"");
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+/* Hide the game's name inside the platinum name: the full title first, then any
+   distinctive title word (4+ letters), e.g. “PARADOX FIXER” → “******* FIXER”. */
+const STOP = new Set(["the","and","edition","remastered","collection","definitive","game","trophies","with","your","from"]);
+function redact(text, title){
+  const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+  let out = text.replace(new RegExp(reEsc(title),"gi"), m => "*".repeat(m.length));
+  const words = title.split(/[^A-Za-z0-9’']+/).map(w=>w.replace(/[’']s$/i,"")).filter(w=>w.length>=4 && !STOP.has(w.toLowerCase()));
+  for(const w of words) out = out.replace(new RegExp("\\b"+reEsc(w)+"\\b","gi"), m => "*".repeat(m.length));
+  return out;
+}
+function store(key, val){ try{ if(val===undefined) return JSON.parse(localStorage.getItem(key)); localStorage.setItem(key, JSON.stringify(val)); }catch(e){ return null; } }
+
+/* Seeded order so every player gets the same daily answer */
+function seededOrder(n, seed){
+  const arr=[...Array(n).keys()]; let s=seed;
+  const rnd=()=>{ s=(s*1664525+1013904223)%4294967296; return s/4294967296; };
+  for(let i=n-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+  return arr;
+}
+let todayNo = Math.floor((Date.now()-LAUNCH)/86400000)+1;
+const ORDER = seededOrder(ANSWERS.length, 2026);
+
+/* ---------- Clue building ---------- */
+/* Fixed 6 hint tiers. Missing data shows N/A but the tier still counts. */
+function seededPick(list, n, seedText){
+  let h=2166136261; for(const ch of seedText){ h^=ch.codePointAt(0); h=Math.imul(h,16777619)>>>0; }
+  const arr=[...list];
+  for(let i=arr.length-1;i>0;i--){ h=(Math.imul(h,1664525)+1013904223)>>>0; const j=h%(i+1); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+  return arr.slice(0,n);
+}
+/* Games whose platinum icon shows the game's name. Add the game's id
+   (the NPWR… part of its PlatPursuit link) and hint 1 uses the rarest trophy instead. */
+const ICON_SHOWS_TITLE = new Set([
+  // "NPWR12345_00",
+]);
+const fullyHidden = s => !/[\p{L}\p{N}]/u.test(s);
+
+function buildClues(g){
+  const NA = "N/A";
+  const c = [];
+  const add=(key,rows,img)=>c.push({key,rows,img});
+  const cap = s => s.charAt(0).toUpperCase()+s.slice(1);
+
+  // 1. Platinum name. If the name is all *, show the plat icon instead.
+  //    If the icon also gives the game away, show the rarest trophy.
+  const pool=(g.trophies||[]).filter(x=>x.name&&x.type!=="platinum");
+  let rarest=null;
+  const platName=g.plat?redact(g.plat,g.title):"";
+  if(platName && !fullyHidden(platName)){
+    add("plat",[["Platinum",platName]]);
+  } else if(g.icon && !ICON_SHOWS_TITLE.has(g.id)){
+    add("plat",[["Platinum icon",""]],{src:g.icon,cls:"plat-icon",alt:"Platinum trophy icon"});
+  } else if(pool.some(x=>x.psn!=null)){
+    rarest=pool.filter(x=>x.psn!=null).sort((a,b)=>a.psn-b.psn)[0];
+    add("plat",[["Rarest trophy",`${redact(rarest.name,g.title)}${rarest.desc?": "+redact(rarest.desc,g.title):""}`],
+                ["Earned by",`${rarest.psn}% on PSN`]]);
+  } else {
+    add("plat",[["Platinum",platName||NA]]);
+  }
+
+  // 2. Earn rate on PSN and PlatPursuit
+  add("rarity",[["PSN earn rate",g.psn!=null?`${g.psn}%`:NA],["PlatPursuit earn rate",g.pp!=null?`${g.pp}%`:NA]]);
+
+  // 3. Trophy count + DLC packs
+  let t=NA;
+  if(g.total!=null){
+    t=`${g.total}`;
+    if(g.breakdown){ const b=g.breakdown; t+=` (${b.platinum} platinum, ${b.gold} gold, ${b.silver} silver, ${b.bronze} bronze)`; }
+  }
+  add("trophies",[["Trophies",t],["DLC",g.dlc==null?NA:(g.dlc?`${g.dlc} Pack${g.dlc>1?"s":""}`:"None")]]);
+
+  // 4. Three random trophies (same three for everyone on the same game)
+  const rest=pool.filter(x=>x!==rarest);
+  if(rest.length){
+    add("random",seededPick(rest,3,g.id||g.title).map(x=>[
+      cap(x.type||"Trophy"),
+      `${redact(x.name,g.title)}${x.desc?": "+redact(x.desc,g.title):""}`
+    ]));
+  } else add("random",[["Trophies",NA]]);
+
+  // 5. Release year
+  add("release",[["Released",g.released||NA]]);
+
+  // 6. Developer
+  add("developer",[["Developer",g.developer||NA]]);
+
+  return c;
+}
+function imgFail(el){
+  const s=document.createElement("span"); s.className="v"; s.textContent="Image can’t load on this page";
+  el.replaceWith(s);
+}
+
+/* ---------- State ---------- */
+let puzzleNo, answer, clues, state;
+/* On GitHub Pages the game reads data/ made by the scraper.
+   Anywhere else (or before the first scrape) it uses the built-in games. */
+let REMOTE=null;
+/* Series lookup: normalised title -> series badges. Shared series = yellow guess. */
+let SERIES={};
+function sameSeries(a,b){
+  const sa=SERIES[norm(a)]||[], sb=SERIES[norm(b)]||[];
+  return sa.some(x=>sb.includes(x));
+}
+async function getJSON(url){ const r=await fetch(url,{cache:"no-cache"}); if(!r.ok) throw new Error(url); return r.json(); }
+async function init(){
+  $("caption").textContent="Loading today’s puzzle…";
+  setTitles([...ANSWERS.map(a=>a.title), ...NON_BADGE, ...DECOYS]);
+  SERIES={};
+  for(const a of ANSWERS) SERIES[norm(a.title)]=(a.badges||[]).filter(b=>!/collection|goty/i.test(b));
+  try{
+    const [idx,sch]=await Promise.all([getJSON("data/index.json"),getJSON("data/schedule.json")]);
+    if(!idx.answers.length||!sch.ids.length) throw new Error("empty");
+    REMOTE={idx,sch};
+    setTitles(idx.titles);
+    SERIES=idx.series||{};
+    const [y,m,d]=sch.start.split("-").map(Number);
+    todayNo=Math.floor((Date.now()-Date.UTC(y,m-1,d))/86400000)+1;
+  }catch(e){ REMOTE=null; }
+  load(todayNo,false);
+}
+async function pickGame(no,practice){
+  if(REMOTE){
+    const ids=practice?REMOTE.idx.answers:REMOTE.sch.ids;
+    const id=practice?ids[Math.floor(Math.random()*ids.length)]:ids[(no-1)%ids.length];
+    try{ return await getJSON(`data/g/${id}.json`); }catch(e){}
+  }
+  return practice?ANSWERS[Math.floor(Math.random()*ANSWERS.length)]:ANSWERS[ORDER[(no-1)%ANSWERS.length]];
+}
+async function load(no, practice){
+  puzzleNo=no; answer=await pickGame(no,practice);
+  clues=buildClues(answer);
+  state = (!practice && store("platle:day:"+no)) || {guesses:[],done:false,won:false,practice:!!practice};
+  render();
+}
+function save(){ if(!state.practice) store("platle:day:"+puzzleNo,state); }
+const limit = () => MAX;
+
+/* ---------- Rendering ---------- */
+function render(){
+  $("puzzleNo").textContent = state.practice ? "Practice round" : `Puzzle #${puzzleNo}`;
+  const used=state.guesses.length;
+  $("pips").innerHTML = Array.from({length:limit()},(_,i)=>{
+    const g=state.guesses[i]; let cls="pip";
+    if(g) cls+= g.right?" right":g.close?" close":" wrong"; else if(i===used&&!state.done) cls+=" current";
+    return `<span class="${cls}"></span>`;
+  }).join("");
+  $("caption").textContent = state.done ? "" :
+    `Hint ${used+1} of ${limit()}. Each wrong guess or skip unlocks the next hint.`;
+
+  const shown = state.done ? clues.length : Math.min(used+1,clues.length);
+  let html="";
+  clues.forEach((c,i)=>{
+    if(i<shown){
+      const rows=c.rows.map(([k,v])=>`<div class="row"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`).join("");
+      const icon=c.img?`<img class="${c.img.cls}" src="${esc(c.img.src)}" alt="${esc(c.img.alt)}" onerror="imgFail(this)">`:"";
+      html+=`<li class="clue${i===shown-1&&!state.done?" latest":""}"><span class="clue-n">${i+1}</span><div class="rows">${rows}${icon}</div></li>`;
+    } else {
+      html+=`<li class="clue locked"><span class="clue-n">${i+1}</span><div>Unlocks after guess ${i}</div></li>`;
+    }
+  });
+  $("clues").innerHTML=html;
+
+  $("guesses").innerHTML=state.guesses.map(g=>
+    `<li><span class="mark ${g.right?"r":g.skip?"s":g.close?"y":"w"}"></span>${g.skip?"Skipped":esc(g.text)}${g.close?" <small>(same badge)</small>":""}</li>`).join("");
+
+  $("play").hidden=state.done;
+  if(state.done) renderResult();
+  else $("result").hidden=true;
+}
+function shareText(){
+  const grid=Array.from({length:limit()},(_,i)=>{const g=state.guesses[i]; return !g?"⬜":g.right?"🟩":g.close?"🟨":"🟥";}).join("");
+  const label=state.practice?"Platle practice":`Platle #${puzzleNo}`;
+  return `${label} 🏆\n${grid}`;
+}
+function renderResult(){
+  const s=store("platle:stats")||{played:0,wins:0,streak:0,best:0};
+  const r=$("result"); r.hidden=false;
+  const url= answer.id ? `https://platpursuit.com/games/${answer.id}/` : "https://platpursuit.com/badges/";
+  r.innerHTML=`<h2>${state.won?"Platinum earned":"Out of guesses"}</h2>
+    <p>The game was <strong>${esc(answer.title)}</strong>${state.won?`, found in ${state.guesses.length} of ${limit()}.`:"."}</p>
+    <p>Platinum: “${esc(answer.plat)}”</p>
+    <p><a href="${url}" target="_blank" rel="noopener">${answer.id?"See the full trophy list on PlatPursuit":"Browse its badge on PlatPursuit"}</a></p>
+    ${state.practice?"":`<div class="stats"><span><b>${s.played}</b>Played</span><span><b>${s.played?Math.round(s.wins/s.played*100):0}%</b>Won</span><span><b>${s.streak}</b>Streak</span><span><b>${s.best}</b>Best</span></div>`}
+    <div class="actions"><button class="primary" id="shareBtn">Copy result</button><button class="ghost" id="practiceBtn">Play a practice round</button></div>
+    <p class="msg" id="shareMsg"></p>`;
+  $("shareBtn").onclick=async()=>{
+    try{ await navigator.clipboard.writeText(shareText()); $("shareMsg").textContent="Result copied."; }
+    catch(e){ $("shareMsg").textContent=shareText(); }
+  };
+  $("practiceBtn").onclick=()=>load(todayNo,true);
+}
+function finish(won){
+  state.done=true; state.won=won;
+  if(!state.practice){
+    const s=store("platle:stats")||{played:0,wins:0,streak:0,best:0,last:0};
+    s.played++; if(won){ s.wins++; s.streak = (s.last===puzzleNo-1)?s.streak+1:1; s.best=Math.max(s.best,s.streak); s.last=puzzleNo; } else { s.streak=0; s.last=puzzleNo; }
+    store("platle:stats",s);
+  }
+}
+
+/* ---------- Input ---------- */
+const input=$("guess"), list=$("suggest"); let active=-1, matches=[];
+function showSuggest(){
+  const q=norm(input.value);
+  if(!q){ matches=[]; }
+  else{
+    const starts=[],has=[];
+    for(const [t,n] of TITLE_INDEX){ if(n.startsWith(q)) starts.push(t); else if(n.includes(q)) has.push(t); if(starts.length>=8) break; }
+    matches=[...starts,...has].slice(0,8);
+  }
+  active=-1;
+  list.innerHTML=matches.map((t,i)=>`<li role="option" id="opt${i}" aria-selected="false">${esc(t)}</li>`).join("");
+  list.hidden=!matches.length; input.setAttribute("aria-expanded",String(!!matches.length));
+}
+function pick(i){ input.value=matches[i]; list.hidden=true; input.setAttribute("aria-expanded","false"); input.focus(); }
+input.addEventListener("input",showSuggest);
+input.addEventListener("keydown",e=>{
+  if(!list.hidden&&(e.key==="ArrowDown"||e.key==="ArrowUp")){
+    e.preventDefault(); active=(active+(e.key==="ArrowDown"?1:-1)+matches.length)%matches.length;
+    [...list.children].forEach((li,i)=>li.setAttribute("aria-selected",String(i===active)));
+    input.setAttribute("aria-activedescendant","opt"+active);
+  } else if(e.key==="Enter"){
+    e.preventDefault(); if(!list.hidden&&active>-1) pick(active); else submit();
+  } else if(e.key==="Escape"){ list.hidden=true; }
+});
+list.addEventListener("mousedown",e=>{ const li=e.target.closest("li"); if(li){ e.preventDefault(); pick([...list.children].indexOf(li)); }});
+input.addEventListener("blur",()=>setTimeout(()=>list.hidden=true,100));
+
+function submit(){
+  const text=input.value.trim(); if(!text){ $("msg").textContent="Type a game title, or skip to see the next clue."; return; }
+  if(state.guesses.some(g=>!g.skip&&norm(g.text)===norm(text))){ $("msg").textContent="You already guessed that one."; return; }
+  const right = norm(text)===norm(answer.title);
+  const close = !right && sameSeries(text, answer.title);
+  state.guesses.push({text,right,close}); input.value=""; list.hidden=true;
+  const more = state.guesses.length<clues.length ? " Here’s another hint." : "";
+  $("msg").textContent = right ? "" : close ? `Close! ${text} is in the same badge.${more}` : `Not ${text}.${more}`;
+  if(right) finish(true); else if(state.guesses.length>=limit()) finish(false);
+  save(); render();
+}
+function skip(){
+  state.guesses.push({skip:true,right:false}); $("msg").textContent= state.guesses.length<clues.length ? "Skipped. Here’s another hint." : "Skipped.";
+  if(state.guesses.length>=limit()) finish(false);
+  save(); render();
+}
+$("submitBtn").onclick=submit;
+$("skipBtn").onclick=skip;
+
+init();
+</script>
+</body>
+</html>
